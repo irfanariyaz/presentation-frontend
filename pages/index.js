@@ -1,114 +1,331 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// pages/index.js
+import { useState } from 'react';
+import Head from 'next/head';
 
 export default function Home() {
-  return (
-    <div
-      className={`${geistSans.variable} ${geistMono.variable} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
-    >
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              pages/index.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  // State for form inputs
+  const [outlineInputs, setOutlineInputs] = useState({
+    topic: '',
+    instructional_level: '',
+    n_slides: 5,
+    file_upload_url: '',
+    file_upload_type: '',
+    lang: 'en'
+  });
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // State for API responses
+  const [outlineResponse, setOutlineResponse] = useState(null);
+  const [slideResponse, setSlideResponse] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Handle input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setOutlineInputs({
+      ...outlineInputs,
+      [name]: name === 'n_slides' ? parseInt(value) : value
+    });
+  };
+
+  // Generate outline
+  const generateOutline = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Format inputs as list as required by the API
+      const inputsList = [
+        { name: "topic", value: outlineInputs.topic },
+        { name: "instructional_level", value: outlineInputs.instructional_level },
+        { name: "n_slides", value: outlineInputs.n_slides },
+        { name: "file_upload_url", value: outlineInputs.file_upload_url },
+        { name: "file_upload_type", value: outlineInputs.file_upload_type },
+        { name: "lang", value: outlineInputs.lang }
+      ];
+      
+      const response = await fetch('/api/generate-outline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': 'dev'
+        },
+        body: JSON.stringify({
+          user: {
+            id: '123',
+            fullName: 'Test User',
+            email: 'test@example.com'
+          },
+          type: 'tool',
+          tool_data: {
+            tool_id: 'outline-generator',
+            inputs: inputsList
+          }
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate outline');
+      }
+      
+      setOutlineResponse(data.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate slides
+  const generateSlides = async () => {
+    if (!outlineResponse || !outlineResponse.outlines) {
+      setError('Please generate outlines first');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Format inputs as list as required by the API
+      const inputsList = [
+        { name: "slides_titles", value: outlineResponse.outlines },
+        { name: "topic", value: outlineInputs.topic },
+        { name: "instructional_level", value: outlineInputs.instructional_level },
+        { name: "lang", value: outlineInputs.lang }
+      ];
+      
+      const response = await fetch('/api/generate-slides', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': 'dev'
+        },
+        body: JSON.stringify({
+          user: {
+            id: '123',
+            fullName: 'Test User',
+            email: 'test@example.com'
+          },
+          type: 'tool',
+          tool_data: {
+            tool_id: 'slide-generator',
+            inputs: inputsList
+          }
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate slides');
+      }
+      
+      setSlideResponse(data.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-6">
+      <Head>
+        <title>Presentation Generator</title>
+        <meta name="description" content="Generate presentation outlines and slides" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+
+      <main className="container mx-auto px-4 max-w-4xl">
+        <h1 className="text-3xl font-bold text-center mb-8">Presentation Generator</h1>
+        
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Step 1: Generate Outline Form */}
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <h2 className="text-xl font-semibold mb-4">Step 1: Generate Outline</h2>
+          
+          <form onSubmit={generateOutline}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Topic <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="topic"
+                  value={outlineInputs.topic}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Instructional Level <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="instructional_level"
+                  value={outlineInputs.instructional_level}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Number of Slides <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="n_slides"
+                  value={outlineInputs.n_slides}
+                  onChange={handleInputChange}
+                  min="1"
+                  max="20"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Language
+                </label>
+                <input
+                  type="text"
+                  name="lang"
+                  value={outlineInputs.lang}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="en"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  File Upload URL (Optional)
+                </label>
+                <input
+                  type="text"
+                  name="file_upload_url"
+                  value={outlineInputs.file_upload_url}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  File Upload Type (Optional)
+                </label>
+                <input
+                  type="text"
+                  name="file_upload_type"
+                  value={outlineInputs.file_upload_type}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition"
+                disabled={loading}
+              >
+                {loading ? 'Generating...' : 'Generate Outline'}
+              </button>
+            </div>
+          </form>
         </div>
+
+        {/* Step 2: Generated Outlines */}
+        {outlineResponse && (
+          <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 className="text-xl font-semibold mb-4">Step 2: Generated Outlines</h2>
+            
+            <div className="space-y-2">
+              {outlineResponse.outlines.map((outline, index) => (
+                <div key={index} className="p-3 bg-gray-50 rounded border border-gray-200">
+                  <p><span className="font-medium">Slide {index + 1}:</span> {outline}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={generateSlides}
+                className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition"
+                disabled={loading}
+              >
+                {loading ? 'Generating...' : 'Generate Slides Content'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Generated Slides */}
+        {slideResponse && (
+          <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 className="text-xl font-semibold mb-4">Step 3: Generated Slides</h2>
+            
+            <div className="space-y-6">
+  {slideResponse.slides.map((slide, index) => (
+    <div key={index} className="p-4 bg-gray-50 rounded border border-gray-200">
+      <h3 className="text-lg font-medium mb-2">{slide.title}</h3>
+      <p className="text-sm text-gray-500 mb-2">Template: {slide.template}</p>
+
+      {/* Handle twoColumn Template */}
+      {slide.template === "twoColumn" && slide.content && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="font-medium">{slide.content.leftColumn}</p>
+          </div>
+          <div>
+            <p className="font-medium">{slide.content.rightColumn}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Handle titleAndBullets Template */}
+      {slide.template === "titleAndBullets" && Array.isArray(slide.content) && (
+        <ul className="list-disc ml-5">
+          {slide.content.map((bullet, i) => (
+            <li key={i}>{bullet}</li>
+          ))}
+        </ul>
+      )}
+
+      {/* Handle titleAndBody and sectionHeader Templates */}
+      {(slide.template === "titleAndBody" || slide.template === "sectionHeader") && (
+        <div className="mt-2">
+          <p className="whitespace-pre-wrap">{slide.content}</p>
+        </div>
+      )}
+    </div>
+  ))}
+</div>
+
+
+            <div className="mt-6 text-center">
+              <p className="text-green-600 font-medium">Slides generated successfully!</p>
+            </div>
+          </div>
+        )}
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
